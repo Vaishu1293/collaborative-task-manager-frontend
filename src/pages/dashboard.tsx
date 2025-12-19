@@ -1,17 +1,33 @@
+import { useEffect } from "react";
+import { useRouter } from "next/router";
 import { useQuery } from "@tanstack/react-query";
+
 import { fetchDashboard } from "@/lib/api";
 import { useTaskSocket } from "@/hooks/useTaskSocket";
+import { useAuth } from "@/hooks/useAuth";
 import { Skeleton } from "@/components/Skeleton";
 
+/* =========================
+   TYPES (MATCH BACKEND)
+========================= */
 type Task = {
   id: string;
   title: string;
-  description: string;
-  priority: string;
-  status: string;
+  description?: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  status: "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
   dueDate: string;
 };
 
+type DashboardResponse = {
+  assigned: Task[];
+  created: Task[];
+  overdue: Task[];
+};
+
+/* =========================
+   SECTION COMPONENT
+========================= */
 function Section({
   title,
   tasks,
@@ -41,16 +57,19 @@ function Section({
                   <p className="text-lg font-medium text-white">
                     {task.title}
                   </p>
-                  <p className="mt-1 text-base text-zinc-400 line-clamp-2">
-                    {task.description}
-                  </p>
+
+                  {task.description && (
+                    <p className="mt-1 text-base text-zinc-400 line-clamp-2">
+                      {task.description}
+                    </p>
+                  )}
                 </div>
 
                 <div className="text-right text-sm text-zinc-400">
                   <p className="font-semibold text-blue-400">
                     {task.priority}
                   </p>
-                  <p>{task.status}</p>
+                  <p>{task.status.replace("_", " ")}</p>
                   <p className="mt-1">
                     {new Date(task.dueDate).toLocaleDateString()}
                   </p>
@@ -64,15 +83,34 @@ function Section({
   );
 }
 
+/* =========================
+   DASHBOARD PAGE
+========================= */
 export default function DashboardPage() {
-  // 🔴 Live updates: invalidates ["dashboard"] on socket events
+  const router = useRouter();
+
+  /* 🔐 AUTH */
+  const { data: auth, isLoading: authLoading } = useAuth();
+
+  /* 🔴 SOCKET: auto-refresh dashboard */
   useTaskSocket();
 
-  const { data, isLoading, error } = useQuery({
+  /* 🔒 Redirect if not logged in */
+  useEffect(() => {
+    if (!authLoading && !auth?.user) {
+      router.replace("/login");
+    }
+  }, [authLoading, auth, router]);
+
+  /* 📊 FETCH DASHBOARD */
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery<DashboardResponse>({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
-
-    // ✅ Stable shape to avoid undefined access
+    enabled: !!auth?.user, // 🔥 don't fetch until logged in
     initialData: {
       assigned: [],
       created: [],
@@ -80,7 +118,8 @@ export default function DashboardPage() {
     },
   });
 
-  if (isLoading) {
+  /* ⏳ LOADING STATE */
+  if (authLoading || isLoading) {
     return (
       <div className="grid gap-6 p-6 md:grid-cols-3 bg-zinc-950 min-h-screen">
         {[1, 2, 3].map((i) => (
@@ -97,6 +136,7 @@ export default function DashboardPage() {
     );
   }
 
+  /* ❌ ERROR STATE */
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-red-400 text-lg">
@@ -105,6 +145,7 @@ export default function DashboardPage() {
     );
   }
 
+  /* ✅ UI */
   return (
     <div className="min-h-screen bg-zinc-950 p-6">
       <h1 className="mb-8 text-3xl font-semibold text-white">
@@ -114,15 +155,15 @@ export default function DashboardPage() {
       <div className="grid gap-8 md:grid-cols-3">
         <Section
           title="Assigned to Me"
-          tasks={data?.assigned ?? []}
+          tasks={data.assigned}
         />
         <Section
           title="Created by Me"
-          tasks={data?.created ?? []}
+          tasks={data.created}
         />
         <Section
           title="Overdue"
-          tasks={data?.overdue ?? []}
+          tasks={data.overdue}
         />
       </div>
     </div>

@@ -17,6 +17,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // 1️⃣ LOGIN
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
         {
@@ -34,11 +35,27 @@ export default function LoginPage() {
         return;
       }
 
-      // 🔥 CRITICAL FIX
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
+      // 2️⃣ FORCE AUTH STATE TO LOAD (CRITICAL)
+      await queryClient.fetchQuery({
+        queryKey: ["me"],
+        queryFn: async () => {
+          const meRes = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
+            { credentials: "include" }
+          );
 
+          if (!meRes.ok) {
+            throw new Error("Auth verification failed");
+          }
+
+          return meRes.json();
+        },
+      });
+
+      // 3️⃣ NAVIGATE ONLY AFTER AUTH IS CONFIRMED
       router.replace("/dashboard");
     } catch (err) {
+      console.error(err);
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
