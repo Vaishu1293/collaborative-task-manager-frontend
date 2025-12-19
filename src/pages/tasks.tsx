@@ -96,7 +96,7 @@ export default function TasksPage() {
   /* =========================
      TAB FILTERING
   ========================= */
-  const filteredTasks = tasks.filter((task) => {
+  const filteredTasks = tasks.filter((task: any) => {
     if (tab === "ASSIGNED_TO_ME") {
       return task.assignedTo?.id === currentUserId;
     }
@@ -238,7 +238,7 @@ export default function TasksPage() {
 
       {/* Tasks Grid */}
       <div className="grid gap-6 md:grid-cols-2">
-        {filteredTasks.map((task) => (
+        {filteredTasks.map((task: any) => (
           <TaskCard
             key={task.id}
             task={task}
