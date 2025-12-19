@@ -1,51 +1,33 @@
 import { useQuery } from "@tanstack/react-query";
 
-/* =========================
-   TYPES
-========================= */
 export type AuthUser = {
   id: string;
   name: string;
   email: string;
 };
 
-export type MeResponse = {
-  user: AuthUser | null;
+type MeResponse = {
+  user: AuthUser;
 };
 
-/* =========================
-   FETCH /auth/me
-========================= */
-async function fetchMe(): Promise<MeResponse> {
+async function fetchMe(): Promise<MeResponse | null> {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
-    {
-      credentials: "include",
-    }
+    { credentials: "include" }
   );
 
-  // ✅ Not logged in is a valid state
-  if (res.status === 401) {
-    return { user: null };
-  }
+  if (res.status === 401) return null;
 
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to fetch auth user");
-  }
-
-  return data as MeResponse;
+  return data;
 }
 
-/* =========================
-   AUTH HOOK
-========================= */
 export function useAuth() {
-  return useQuery<MeResponse>({
-    queryKey: ["me"], // 🔥 SINGLE SOURCE OF TRUTH
+  return useQuery({
+    queryKey: ["auth", "me"],
     queryFn: fetchMe,
-    staleTime: 30_000, // 30s cache
-    retry: false,      // don't retry on 401
+    retry: false,
+    staleTime: 0,          // 🔥 IMPORTANT
+    refetchOnWindowFocus: true,
   });
 }
